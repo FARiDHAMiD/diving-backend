@@ -9,7 +9,7 @@ COURSE_LEVELS = (
 )
 
 class UserProfile(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     favorites = models.ManyToManyField('Course', blank=True, related_name='favorited_by')
 
     def __str__(self):
@@ -21,6 +21,7 @@ class Course(models.Model):
     price = models.DecimalField(max_digits=10, decimal_places=2)
     number_of_days = models.PositiveIntegerField()
     level = models.CharField(max_length=20, choices=COURSE_LEVELS)
+    location = models.CharField(max_length=250, null=True, blank=True)
     image = models.ImageField(upload_to='courses/', blank=True, null=True)
     
     # Static requirement fields

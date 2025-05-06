@@ -1,6 +1,76 @@
+from django.contrib.auth import authenticate
 from rest_framework import serializers
+from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth.models import User
 from .models import *
+
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserProfile
+        fields = ['favorites']  # Or whatever fields you want to expose
+
+
+class UserSerializer(serializers.ModelSerializer):
+    profile = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = '__all__'
+
+    def get_profile(self, obj):
+        return UserProfileSerializer(obj.profile).data
+
+# Sign Up
+class RegisterSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True)
+
+    class Meta:
+        model = User
+        fields = ('email', 'username', 'password', 'first_name', 'last_name')
+
+    def create(self, validated_data):
+        user = User.objects.create_user(
+            email=validated_data['email'],
+            username=validated_data['username'],
+            first_name=validated_data['first_name'],
+            last_name=validated_data['last_name'],
+            password=validated_data['password'],
+            # role=validated_data['role']
+        )
+        return user
+
+# Login
+class LoginSerializer(serializers.Serializer):
+    username = serializers.CharField()
+    password = serializers.CharField(write_only=True)
+
+    def validate(self, data):
+        username = data.get("username")
+        password = data.get("password")
+
+        user = authenticate(username=username, password=password)
+        if user is None:
+            raise serializers.ValidationError("Invalid credentials")
+
+        tokens = RefreshToken.for_user(user)
+        return {
+            "user": {
+                "id": user.id,
+                "username": user.username,
+                # "role": user.role
+            },
+            "tokens": {
+                "refresh": str(tokens),
+                "access": str(tokens.access_token),
+            },
+        }
+    
+# Tokens for blacklist
+class TokenSerializer(serializers.Serializer):
+    refresh = serializers.CharField()
+    access = serializers.CharField()
+
 
 class CourseFeatureSerializer(serializers.ModelSerializer):
     class Meta:
