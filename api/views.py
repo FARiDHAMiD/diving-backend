@@ -117,12 +117,59 @@ class CartItemViewSet(viewsets.ModelViewSet):
     def checkout(request):
         if not request.user.is_authenticated:
             return Response({"detail": "Authentication required."}, status=status.HTTP_401_UNAUTHORIZED)
-        
-        cart_items = CartItem.objects.filter(user=request.user)
-        
-        # Process order (for example, create an order record in the database)
-        # For now, we just clear the cart
-        cart_items.delete()
+
+        cart_items_data = request.data.get('cart_items', [])
+
+        if not cart_items_data:
+            return Response({"detail": "Your cart is empty."}, status=status.HTTP_400_BAD_REQUEST)
+
+        total_price = 0
+        cart_items_created = []
+
+        order = Order.objects.create(user=request.user)
+
+        for item in cart_items_data:
+            quantity = item.get("quantity", 1)
+
+            course = None
+            product = None
+
+            # Handle course-based items
+            course_id = item.get("course_id") or item.get("id")  # Fallback to id if needed
+            if item.get("type") == "course" or "course_id" in item or "title" in item:
+                try:
+                    course = Course.objects.get(id=course_id)
+                    total_price += course.price * quantity
+                    cart_item = CartItem.objects.create(
+                        user=request.user,
+                        course=course,
+                        quantity=quantity
+                    )
+                    cart_items_created.append(cart_item)
+                    continue
+                except Course.DoesNotExist:
+                    pass  # or return error
+
+            # Handle product-based items
+            product_id = item.get("product_id") or item.get("id")
+            if item.get("type") == "product" or "product_id" in item:
+                try:
+                    product = Product.objects.get(id=product_id)
+                    total_price += product.price * quantity
+                    cart_item = CartItem.objects.create(
+                        user=request.user,
+                        product=product,
+                        quantity=quantity
+                    )
+                    cart_items_created.append(cart_item)
+                    continue
+                except Product.DoesNotExist:
+                    pass  # or return error
+
+        # Associate items with the order
+        order.items.set(cart_items_created)
+        order.total_price = total_price
+        order.save()
 
         return Response({"detail": "Order placed successfully!"}, status=status.HTTP_200_OK)
 
