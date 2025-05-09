@@ -1,5 +1,6 @@
+from django.shortcuts import get_object_or_404
 from rest_framework import viewsets, permissions, status
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, action
 from .models import *
 from .serializers import *
 from rest_framework.views import APIView
@@ -181,12 +182,60 @@ class OrderViewSet(viewsets.ModelViewSet):
         return Order.objects.filter(user=self.request.user)
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+            order = serializer.save(user=self.request.user)
+            # cart_items = []
+            # Save CartItems and link them to the order
+            cart_items = self.request.data.get('cart_items', [])
+            for item in cart_items:
+                course_id = item.get('course_id')
+                product_id = item.get('product_id')
+                quantity = item.get('quantity')
 
+                # Save CartItem and associate it with the order
+                if course_id:
+                    course = Course.objects.get(id=course_id)
+                    cart_item = CartItem.objects.create(
+                        user=self.request.user,
+                        course=course,
+                        quantity=quantity
+                    )
+                elif product_id:
+                    product = Product.objects.get(id=product_id)
+                    cart_item = CartItem.objects.create(
+                        user=self.request.user,
+                        product=product,
+                        quantity=quantity
+                    )
+
+                # Link CartItem to the order
+                order.items.add(cart_item)
+
+            # Set the total price of the order
+            total_price = sum([item['quantity'] * (Course.objects.get(id=item.get('course_id')).price if item.get('course_id') else Product.objects.get(id=item.get('product_id')).price) for item in cart_items])
+            order.total_price = total_price
+            order.save()
 class UserProfileViewSet(viewsets.ModelViewSet):
     queryset = UserProfile.objects.all()
     serializer_class = UserProfileSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    @action(detail=False, methods=['get'])
+    def me(self, request):
+        profile = self.get_queryset().get(user=request.user)
+        serializer = self.get_serializer(profile)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'], url_path='toggle_favorite')
+    def toggle_favorite(self, request, pk=None):
+        profile = self.get_queryset().get(user=request.user)
+        course = get_object_or_404(Course, pk=pk)
+
+        if course in profile.favorites.all():
+            profile.favorites.remove(course)
+            return Response({'status': 'removed'})
+        else:
+            profile.favorites.add(course)
+            return Response({'status': 'added'})
 
 class RatingViewSet(viewsets.ModelViewSet):
     queryset = Rating.objects.all() 

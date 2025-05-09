@@ -32,9 +32,7 @@ class Course(models.Model):
 
     def __str__(self):
         return self.title
-    def __str__(self):
-        return self.title
-
+  
 class CourseFeature(models.Model):
     course = models.ForeignKey(Course, related_name='features', on_delete=models.CASCADE)
     description = models.CharField(max_length=255)
@@ -87,15 +85,29 @@ class CartItem(models.Model):
             return f'{self.user.username} - {self.product.title}'
 
 
+    def get_total_price(self):
+        """Calculate the total price of the cart item based on the product or course."""
+        if self.course:
+            return self.course.price * self.quantity
+        elif self.product:
+            return self.product.price * self.quantity
+        return 0
+
+
+
+
 class Order(models.Model):
+    PAYMENT_CHOICES=(
+        ('cash', 'Cash'),
+        ('visa', 'Visa'),
+    )
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     items = models.ManyToManyField(CartItem)
     total_price = models.DecimalField(max_digits=10, decimal_places=2)
     created_at = models.DateTimeField(auto_now_add=True)
     paid = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
+    payment_method = models.CharField(max_length=20, choices=PAYMENT_CHOICES, default='cash')
 
     
     def __str__(self):
         return f'{self.user.username} - {self.created_at} | {self.total_price} L.E.'
-
