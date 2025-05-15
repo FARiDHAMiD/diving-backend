@@ -22,7 +22,7 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
         token['is_staff'] = user.is_staff
         # token['groups'] = user.groups.all()
         token['username'] = user.username
-        token['profile'] = user.profile.id
+        # token['profile'] = user.profile.id
         
         return token
 
